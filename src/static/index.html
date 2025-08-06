@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Generation Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f5dc 0%, #2c2c2c 100% );
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* Header */
+        .header {
+            background-blend-mode: overlay;
+            background: rgba(0, 0, 0, 0.3) url('black_marble.jpg') center;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0, 0, 0, 0.4), rgba(245, 245, 220, 0.2));
+        }
+
+        .header h1 {
+            color: #f5f5dc;
+            font-size: 2.5rem;
+            font-weight: 600;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            z-index: 1;
+            position: relative;
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .welcome-message {
+            font-family: 'Dancing Script', cursive;
+            font-size: 4rem;
+            font-weight: 700;
+            color: #2c2c2c;
+            text-shadow: 2px 2px 4px rgba(245, 245, 220, 0.8);
+            margin-bottom: 20px;
+            background: linear-gradient(45deg, #2c2c2c, #8b7355);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.2rem;
+            color: #666;
+            font-weight: 300;
+        }
+
+        /* Upload Section */
+        .upload-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(245, 245, 220, 0.3);
+        }
+
+        .upload-area {
+            border: 3px dashed #8b7355;
+            border-radius: 15px;
+            padding: 60px 20px;
+            text-align: center;
+            background: linear-gradient(135deg, rgba(245, 245, 220, 0.1), rgba(139, 115, 85, 0.05));
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(245, 245, 220, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .upload-area:hover::before {
+            left: 100%;
+        }
+
+        .upload-area:hover {
+            border-color: #2c2c2c;
+            background: linear-gradient(135deg, rgba(245, 245, 220, 0.2), rgba(139, 115, 85, 0.1));
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            color: #8b7355;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .upload-text {
+            font-size: 1.3rem;
+            color: #2c2c2c;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .upload-subtext {
+            color: #666;
+            font-size: 1rem;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-button {
+            background: linear-gradient(45deg, #2c2c2c, #8b7355);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Video Section */
+        .video-section {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(245, 245, 220, 0.3);
+            text-align: center;
+            display: none;
+        }
+
+        .video-container {
+            position: relative;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .video-player {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            color: #2c2c2c;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(139, 115, 85, 0.3);
+            border-top: 4px solid #8b7355;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        /* Footer */
+        .footer {
+            background-blend-mode: overlay;
+            background: rgba(0, 0, 0, 0.3) url('black_marble.jpg') center;
+            padding: 30px 0;
+            text-align: center;
+            position: relative;
+            margin-top: 60px;
+        }
+
+        .footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, rgba(0, 0, 0, 0.4), rgba(245, 245, 220, 0.2));
+        }
+
+        .footer-content {
+            position: relative;
+            z-index: 1;
+            color: #f5f5dc;
+            font-size: 1rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .welcome-message {
+                font-size: 2.5rem;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .upload-section, .video-section {
+                padding: 20px;
+                margin: 20px 10px;
+            }
+
+            .upload-area {
+                padding: 40px 15px;
+            }
+
+            .container {
+                padding: 20px 10px;
+            }
+        }
+
+        /* Success Message */
+        .success-message {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            display: none;
+        }
+
+        /* Error Message */
+        .error-message {
+            background: linear-gradient(45deg, #f44336, #da190b);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <h1>Video Generation Platform</h1>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Welcome Section -->
+        <section class="welcome-section">
+            <h2 class="welcome-message">Welcome to Your Creative Studio!</h2>
+            <p class="welcome-subtitle">Transform your text or PDF into stunning video presentations with AI-powered slide generation</p>
+        </section>
+
+        <!-- Upload Section -->
+        <section class="upload-section">
+            <h3 class="section-title">Upload Your File</h3>
+            <div class="upload-area" onclick="document.getElementById('file-input').click()">
+                <span class="upload-icon">📄</span>
+                <div class="upload-text">Click to upload or drag and drop</div>
+                <div class="upload-subtext">Supported formats: .txt, .pdf</div>
+                <input type="file" id="file-input" accept=".txt,.pdf" onchange="handleFileUpload(event)">
+            </div>
+            <button class="upload-button" onclick="generateVideo()" id="generate-btn" disabled>
+                Generate Video
+            </button>
+
+            <div class="success-message" id="success-message"></div>
+            <div class="error-message" id="error-message"></div>
+        </section>
+
+        <!-- Loading Section -->
+        <section class="loading" id="loading-section">
+            <div class="spinner"></div>
+            <div class="loading-text">Generating your video... This may take a few minutes.</div>
+        </section>
+
+        <!-- Video Section -->
+        <section class="video-section" id="video-section">
+            <h3 class="section-title">Your Generated Video</h3>
+            <div class="video-container">
+                <video class="video-player" id="video-player" controls>
+                    <source src="" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </section>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>&copy; 2025 Video Generation Platform. Powered by AI Technology.</p>
+        </div>
+    </footer>
+
+    <script>
+        let uploadedFile = null;
+        const allowedTypes = ['text/plain', 'application/pdf'];
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file && allowedTypes.includes(file.type)) {
+                uploadedFile = file;
+                document.getElementById('generate-btn').disabled = false;
+                showMessage('success', `File "${file.name}" uploaded successfully!`);
+
+                const uploadArea = document.querySelector('.upload-area');
+                uploadArea.innerHTML = `
+                    <span class="upload-icon">✅</span>
+                    <div class="upload-text">File Ready: ${file.name}</div>
+                    <div class="upload-subtext">Click to change file</div>
+                `;
+            } else {
+                showMessage('error', 'Please upload a valid .txt or .pdf file');
+                document.getElementById('generate-btn').disabled = true;
+            }
+        }
+
+        function showMessage(type, message) {
+            const successEl = document.getElementById('success-message');
+            const errorEl = document.getElementById('error-message');
+
+            successEl.style.display = 'none';
+            errorEl.style.display = 'none';
+
+            if (type === 'success') {
+                successEl.textContent = message;
+                successEl.style.display = 'block';
+            } else {
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+            }
+
+            setTimeout(() => {
+                successEl.style.display = 'none';
+                errorEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function generateVideo() {
+            if (!uploadedFile) {
+                showMessage('error', 'Please upload a file first');
+                return;
+            }
+
+            document.getElementById('loading-section').style.display = 'block';
+            document.getElementById('video-section').style.display = 'none';
+            document.getElementById('generate-btn').disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', uploadedFile);
+
+                const response = await fetch('/api/generate-video', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.message || `HTTP error! status: ${response.status}`);
+                }
+
+                if (result.success) {
+                    const videoPlayer = document.getElementById('video-player');
+
+                    videoPlayer.src = result.video_url;
+
+                    document.getElementById('loading-section').style.display = 'none';
+                    document.getElementById('video-section').style.display = 'block';
+
+                    showMessage('success', 'Video generated successfully!');
+                } else {
+                    throw new Error(result.message || 'Failed to generate video');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showMessage('error', `Error generating video: ${error.message}`);
+                document.getElementById('loading-section').style.display = 'none';
+            } finally {
+                document.getElementById('generate-btn').disabled = false;
+            }
+        }
+
+        const uploadArea = document.querySelector('.upload-area');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#2c2c2c';
+            uploadArea.style.backgroundColor = 'rgba(245, 245, 220, 0.3)';
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#8b7355';
+            uploadArea.style.backgroundColor = '';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#8b7355';
+            uploadArea.style.backgroundColor = '';
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (allowedTypes.includes(file.type)) {
+                    uploadedFile = file;
+                    document.getElementById('generate-btn').disabled = false;
+                    showMessage('success', `File "${file.name}" uploaded successfully!`);
+
+                    uploadArea.innerHTML = `
+                        <span class="upload-icon">✅</span>
+                        <div class="upload-text">File Ready: ${file.name}</div>
+                        <div class="upload-subtext">Click to change file</div>
+                    `;
+                } else {
+                    showMessage('error', 'Please upload a valid .txt or .pdf file');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
