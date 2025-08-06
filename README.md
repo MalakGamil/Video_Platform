@@ -117,7 +117,3 @@ The application will start, and you can access it by opening your web browser an
 
 
 
-
-Your Name - [@your_twitter](https://twitter.com/your_twitter) - email@example.com
-
-Project Link: [https://github.com/your-username/your-repo-name](https://github.com/your-username/your-repo-name)
