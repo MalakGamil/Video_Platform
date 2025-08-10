@@ -1,8 +1,8 @@
 import os
-# import random
+import random
+import colorsys
 import re
 import json
-# import textwrap
 import requests
 import shutil
 import google.generativeai as genai
@@ -14,8 +14,6 @@ from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 import nltk
 from flask import Blueprint, request, jsonify, current_app
-# from werkzeug.utils import secure_filename
-# import tempfile
 import uuid
 import fitz  # PyMuPDF
 
@@ -96,224 +94,182 @@ def generate_slide_data(topic: str) -> list[dict]:
         ]
 
 
+def hex_to_rgb(hex_color):
+    """Converts a hex color string to an (r, g, b) tuple."""
+    hex_color = hex_color.lstrip('#')
+    return tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def rgb_to_hex(rgb_color):
+    """Converts an (r, g, b) tuple to a hex color string."""
+    return '#{:02x}{:02x}{:02x}'.format(*rgb_color)
+
+
+def get_contrasting_color(hex_color):
+    """Get a contrasting color (black or white) for text."""
+    r, g, b = hex_to_rgb(hex_color)
+    brightness = (r * 299 + g * 587 + b * 114) / 1000
+    return "#FFFFFF" if brightness < 128 else "#000000"
+
+
+def get_vibrant_title_color(hex_color):
+    """Get a vibrant, contrasting color for titles."""
+    r, g, b = hex_to_rgb(hex_color)
+    h, s, v = colorsys.rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0)
+    new_hue = (h + 0.5) % 1.0
+    new_saturation = max(0.8, s)
+    new_value = max(0.9, v)
+    new_r, new_g, new_b = [int(c * 255) for c in colorsys.hsv_to_rgb(new_hue, new_saturation, new_value)]
+    return rgb_to_hex((new_r, new_g, new_b))
+
+
+def create_gradient(base_color, size):
+    """Creates a vertical gradient background from the base color."""
+    r, g, b = hex_to_rgb(base_color)
+    gradient = Image.new("RGBA", size, color=(0, 0, 0, 0))
+    draw = ImageDraw.Draw(gradient)
+    for y in range(size[1]):
+        ratio = y / size[1]
+        new_r = int(r * (1 - ratio * 0.2))
+        new_g = int(g * (1 - ratio * 0.2))
+        new_b = int(b * (1 - ratio * 0.2))
+        draw.line([(0, y), (size[0], y)], fill=(new_r, new_g, new_b, 255))
+    return gradient
+
+
+def add_background_patterns(draw, size, base_color):
+    """Adds subtle, randomly generated geometric patterns to the background."""
+    r, g, b = hex_to_rgb(base_color)
+    pattern_color = (min(r + 25, 255), min(g + 25, 255), min(b + 25, 255), 40)
+    for _ in range(50):
+        shape_type = random.choice(["circle", "triangle", "line"])
+        x1, y1 = random.randint(0, size[0]), random.randint(0, size[1])
+        if shape_type == "circle":
+            radius = random.randint(30, 150)
+            draw.ellipse([x1 - radius, y1 - radius, x1 + radius, y1 + radius], fill=pattern_color, outline=None)
+        elif shape_type == "triangle":
+            x2, y2 = x1 + random.randint(-120, 120), y1 + random.randint(-120, 120)
+            x3, y3 = x1 + random.randint(-120, 120), y1 + random.randint(-120, 120)
+            draw.polygon([(x1, y1), (x2, y2), (x3, y3)], fill=pattern_color, outline=None)
+        elif shape_type == "line":
+            x2, y2 = x1 + random.randint(-200, 200), y1 + random.randint(-200, 200)
+            width = random.randint(2, 5)
+            draw.line([(x1, y1), (x2, y2)], fill=pattern_color, width=width)
+
+
+def add_decorative_frame(draw, size):
+    """Adds a decorative frame around the slide."""
+    frame_color = (255, 255, 255, 80)
+    margin = 30
+    draw.rectangle([(margin, margin), (size[0] - margin, size[1] - margin)], outline=frame_color, width=3)
+    draw.rectangle([(margin + 8, margin + 8), (size[0] - margin - 8, size[1] - margin - 8)], outline=frame_color,
+                   width=2)
+    corner_size = 45
+    for x in [margin, size[0] - margin - corner_size]:
+        for y in [margin, size[1] - margin - corner_size]:
+            draw.rectangle([(x, y), (x + corner_size, y + corner_size)], outline=frame_color, width=2)
+
+
+# --- Main Function to Create Slide ---
+
 def create_slide_image(slide, index, image_path=None, work_dir="/tmp"):
-    """Create slide image with improved typography and design"""
+    """
+    Creates a single slide image with an expanded text area.
+    The slide splitting logic has been removed.
+    """
     bg_color = slide.get("background", "#1E1E3F")
+    width, height = 1920, 1150
 
-    img = Image.new("RGB", (1280, 720), color=bg_color)
-
-    gradient = create_gradient(bg_color, (1280, 720))
-    img.paste(gradient, (0, 0), gradient)
-
-    img = add_design_elements(img, bg_color)
-
+    # 1. Create Base Image
+    img = create_gradient(bg_color, (width, height)).convert("RGBA")
+    pattern_draw = ImageDraw.Draw(img)
+    add_background_patterns(pattern_draw, (width, height), bg_color)
     draw = ImageDraw.Draw(img)
 
     try:
-        title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 110)
-        text_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 70)
-        number_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 50)
-    except:
-
+        title_font = ImageFont.truetype("LATINWD.TTF", size=60)
+        text_font = ImageFont.truetype("MOD20.TTF", size=38)
+        number_font = ImageFont.truetype("LATINWD.TTF", size=52)
+    except IOError:
+        print("Custom fonts not found. Using default fonts.")
         title_font = ImageFont.load_default()
         text_font = ImageFont.load_default()
         number_font = ImageFont.load_default()
 
-    header_height = 140
-    header_bg = Image.new("RGBA", (1280, header_height), color=(0, 0, 0, 200))
-    img.paste(header_bg, (0, 0), header_bg)
-
-    slide_number_size = 160
-    slide_number_bg = Image.new("RGBA", (slide_number_size, slide_number_size), color=(255, 255, 255, 240))
-    mask = Image.new('L', (slide_number_size, slide_number_size), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.ellipse((0, 0, slide_number_size, slide_number_size), fill=255)
-    slide_number_bg.putalpha(mask)
-
-    slide_number_draw = ImageDraw.Draw(slide_number_bg)
-    text = str(index + 1)
-    text_bbox = slide_number_draw.textbbox((0, 0), text, font=number_font)
-    text_width = text_bbox[2] - text_bbox[0]
-    text_height = text_bbox[3] - text_bbox[1]
-    text_x = (slide_number_size - text_width) // 2
-    text_y = (slide_number_size - text_height) // 2
-    slide_number_draw.text((text_x, text_y), text, fill=(0, 0, 0, 255), font=number_font)
-
-    img.paste(slide_number_bg, (1160, 600), slide_number_bg)
-
-    title_text = slide.get("title", "")
-
+    # 2. Draw Title
+    title_text = slide.get("title", "Default Title")
     title_color = get_vibrant_title_color(bg_color)
-
     title_bbox = draw.textbbox((0, 0), title_text, font=title_font)
     title_width = title_bbox[2] - title_bbox[0]
-    title_x = (1280 - title_width) // 2
-    title_y = 25
-
-    shadow_color = (0, 0, 0, 180)
-    draw.text((title_x + 3, title_y + 3), title_text, font=title_font, fill=shadow_color)
-
+    title_height = title_bbox[3] - title_bbox[1]
+    title_x = (width - title_width) / 2
+    title_y = 70
     draw.text((title_x, title_y), title_text, font=title_font, fill=title_color)
+    underline_y = title_y + title_height + 10
+    draw.line([(title_x, underline_y), (title_x + title_width, underline_y)], fill=title_color, width=5)
 
+    # 3. Draw Explanation Text
     explanation = slide.get("explanation", "")
+    if explanation:
+        text_area_x, text_area_y = 90, 290
+        max_text_width = 870
 
-    wrapped_lines = []
-    words = explanation.split()
-    current_line = ""
+        # Wrap text logic remains the same
+        words = explanation.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            line_bbox = draw.textbbox((0, 0), test_line, font=text_font)
+            if line_bbox[2] - line_bbox[0] <= max_text_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        lines.append(current_line)
 
-    for word in words:
-        test_line = current_line + " " + word if current_line else word
-        test_bbox = draw.textbbox((0, 0), test_line, font=text_font)
-        test_width = test_bbox[2] - test_bbox[0]
+        line_height = text_font.getbbox("A")[3] * 1.8
+        text_color = get_contrasting_color(bg_color)
 
-        if test_width <= 580:  # Max width for text area
-            current_line = test_line
-        else:
-            if current_line:
-                wrapped_lines.append(current_line)
-            current_line = word
+        max_text_area_height = height - text_area_y - 100
 
-    if current_line:
-        wrapped_lines.append(current_line)
+        for i, line in enumerate(lines):
 
-    text_area_width = 620
-    text_area_height = 320
-    text_bg = Image.new("RGBA", (text_area_width, text_area_height), color=(0, 0, 0, 160))
-    text_bg = text_bg.filter(ImageFilter.GaussianBlur(radius=4))
-
-    img.paste(text_bg, (40, 170), text_bg)
-
-    line_height = 65
-    start_y = 190
-
-    for i, line in enumerate(wrapped_lines[:4]):
-        draw.text((60, start_y + i * line_height), line, font=text_font, fill="white")
+            if (i * line_height) > max_text_area_height:
+                break
+            draw.text((text_area_x, text_area_y + i * line_height), line, font=text_font, fill=text_color)
 
     if image_path and os.path.exists(image_path):
         try:
-            slide_image = Image.open(image_path)
-            max_width = 520
-            max_height = 420
-            slide_image.thumbnail((max_width, max_height))
-            frame = create_enhanced_image_frame(slide_image, bg_color)
-            img.paste(frame, (680, 160), frame if frame.mode == 'RGBA' else None)
+            slide_image = Image.open(image_path).convert("RGBA")
+            slide_image.thumbnail((800, 700))
+            frame_size = 20
+            bordered_image = Image.new("RGBA",
+                                       (slide_image.width + frame_size * 2, slide_image.height + frame_size * 2),
+                                       (255, 255, 255, 255))
+            bordered_image.paste(slide_image, (frame_size, frame_size))
+            shadow = Image.new("RGBA", (bordered_image.width + 30, bordered_image.height + 30), (0, 0, 0, 0))
+            shadow_draw = ImageDraw.Draw(shadow)
+            shadow_draw.rectangle((0, 0, shadow.width, shadow.height), fill=(0, 0, 0, 100))
+            shadow = shadow.filter(ImageFilter.GaussianBlur(15))
+            img_x, img_y = 1020, 320
+            img.paste(shadow, (img_x - 15, img_y + 15), shadow)
+            img.paste(bordered_image, (img_x, img_y), bordered_image)
         except Exception as e:
-            print(f"Error loading image {image_path}: {e}")
+            print(f"Error processing image {image_path}: {e}")
 
-    footer_height = 40
-    footer_bg = Image.new("RGBA", (1280, footer_height), color=(0, 0, 0, 180))
-    img.paste(footer_bg, (0, 720 - footer_height), footer_bg)
+    add_decorative_frame(draw, (width, height))
+    number_text = str(index + 1)
+    number_color = get_contrasting_color(bg_color)
+    number_bbox = draw.textbbox((0, 0), number_text, font=number_font)
+    number_width = number_bbox[2] - number_bbox[0]
+    draw.text((width - 70 - number_width / 2, height - 100), number_text, font=number_font, fill=number_color)
 
+    final_img = img.convert("RGB")
     path = os.path.join(work_dir, f"slide_{index}.png")
-    img.save(path)
+    final_img.save(path)
     return path
 
-def get_vibrant_title_color(hex_color):
-    """Get a vibrant color for titles that contrasts well"""
-    r = int(hex_color[1:3], 16)
-    g = int(hex_color[3:5], 16)
-    b = int(hex_color[5:7], 16)
-
-    brightness = (r * 299 + g * 587 + b * 114) / 1000
-
-    if brightness < 128:
-        vibrant_colors = ["#FFD700", "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFEAA7", "#DDA0DD"]
-    else:
-        vibrant_colors = ["#8B0000", "#2E8B57", "#4B0082", "#B22222", "#FF4500", "#9932CC"]
-
-
-    import hashlib
-    color_index = int(hashlib.md5(hex_color.encode()).hexdigest(), 16) % len(vibrant_colors)
-    return vibrant_colors[color_index]
-
-def create_enhanced_image_frame(image, base_color):
-    """Create enhanced frame for image with better styling"""
-    frame_width = 12
-    frame = Image.new("RGBA", (image.width + 2 * frame_width, image.height + 2 * frame_width),
-                      color=(255, 255, 255, 250))
-
-
-    shadow_offset = 15
-    shadow = Image.new("RGBA", (image.width + 2 * frame_width + shadow_offset * 2,
-                               image.height + 2 * frame_width + shadow_offset * 2),
-                       color=(0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.rectangle([(shadow_offset, shadow_offset),
-                          (shadow.width - shadow_offset, shadow.height - shadow_offset)],
-                         fill=(0, 0, 0, 120))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=12))
-
-    final_frame = Image.new("RGBA", shadow.size, color=(0, 0, 0, 0))
-    final_frame.paste(shadow, (0, 0), shadow)
-    final_frame.paste(frame, (shadow_offset, shadow_offset), frame)
-    final_frame.paste(image, (shadow_offset + frame_width, shadow_offset + frame_width))
-
-    return final_frame
-
-def get_contrasting_color(hex_color, bright=False):
-    """Get contrasting color for text"""
-    r = int(hex_color[1:3], 16)
-    g = int(hex_color[3:5], 16)
-    b = int(hex_color[5:7], 16)
-
-    brightness = (r * 299 + g * 587 + b * 114) / 1000
-
-    if bright:
-        return "#FFFF00" if brightness < 128 else "#FFFFFF"
-    else:
-        return "#FFFFFF" if brightness < 128 else "#000000"
-
-def create_gradient(base_color, size):
-    """Create gradient background"""
-    r, g, b = int(base_color[1:3], 16), int(base_color[3:5], 16), int(base_color[5:7], 16)
-
-    gradient = Image.new("RGBA", size, color=(0, 0, 0, 0))
-    draw = ImageDraw.Draw(gradient)
-
-    for y in range(size[1]):
-        alpha = 255 - int(y / size[1] * 200)
-        draw.line([(0, y), (size[0], y)], fill=(r, g, b, alpha))
-
-    return gradient
-
-def add_design_elements(img, base_color):
-    """Add design elements to image"""
-    elements = Image.new("RGBA", img.size, color=(0, 0, 0, 0))
-    draw = ImageDraw.Draw(elements)
-
-    # Add lines
-    draw.line([(0, 120), (1280, 120)], fill=(255, 255, 255, 100), width=2)
-    draw.line([(0, 690), (1280, 690)], fill=(255, 255, 255, 100), width=2)
-
-    # Add vertical lines
-    for i in range(5):
-        x = 20 + i * 10
-        draw.line([(x, 120), (x, 690)], fill=(255, 255, 255, 30), width=1)
-
-    for i in range(5):
-        x = 1260 - i * 10
-        draw.line([(x, 120), (x, 690)], fill=(255, 255, 255, 30), width=1)
-
-    return Image.alpha_composite(img.convert("RGBA"), elements).convert("RGB")
-
-def create_image_frame(image, base_color):
-    """Create frame for image"""
-    frame_width = 10
-    frame = Image.new("RGBA", (image.width + 2 * frame_width, image.height + 2 * frame_width),
-                      color=(255, 255, 255, 220))
-
-    shadow = Image.new("RGBA", (image.width + 2 * frame_width + 20, image.height + 2 * frame_width + 20),
-                       color=(0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.rectangle([(10, 10), (shadow.width - 10, shadow.height - 10)], fill=(0, 0, 0, 100))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(radius=10))
-
-    final_frame = Image.new("RGBA", shadow.size, color=(0, 0, 0, 0))
-    final_frame.paste(shadow, (0, 0), shadow)
-    final_frame.paste(frame, (10, 10), frame)
-    final_frame.paste(image, (10 + frame_width, 10 + frame_width))
-
-    return final_frame
 
 def create_audio(text, index, work_dir="/tmp", lang="en", voice_type="female"):
     """Create enhanced audio file with more natural speech patterns"""
